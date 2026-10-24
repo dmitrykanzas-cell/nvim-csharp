@@ -51,7 +51,7 @@ local keys = {
   { "<leader>di", "Шаг внутрь (into)", "Step into", "F11", true },
   { "<leader>du", "Шаг наружу (out)", "Step out", "Shift+F11", true },
   { "<leader>dx", "Остановить отладку", "Stop debugging", "Shift+F5", true },
-  { "<leader>dD", "Режим отладки (меню не закрывается)", "Debug mode (sticky menu)" },
+  { "<leader>dm", "Закрепить меню отладки", "Pin debug menu", icon = { icon = "󰐃", color = "yellow" } },
   { "<leader>dh", "Переменные (всплывающее окно)", "Variables (float)", nil, true },
   { "<leader>de", "Вернуться в код", "Back to code" },
   { "<leader>dd", "Окна отладки показать/скрыть", "Toggle debug windows" },

@@ -207,21 +207,7 @@ return {
       { "<leader>dd", function() require("dapui").toggle() end, desc = "Окна отладки показать/скрыть" },
       { "<leader>dh", function() require("dapui").float_element("scopes", { enter = true }) end, desc = "Переменные (всплывающее окно)" },
       { "<leader>de", function() _G.goto_code_window() end, desc = "Вернуться в код" },
-      -- Режим отладки: меню <leader>d остаётся открытым, шаги одной клавишей (o, i, u). Выход: Esc.
-      {
-        "<leader>dm",
-        function()
-          -- which-key caches its key tree per buffer. Keep the tree from the
-          -- editor buffer that opened the menu, otherwise BufEnter during a
-          -- debug step silently ends the loop.
-          require("which-key").show({
-            keys = "<leader>d",
-            loop = true,
-            buf = vim.api.nvim_get_current_buf(),
-          })
-        end,
-        desc = "Закрепить меню отладки",
-      },
+      { "<leader>dm", function() require("debug_mode").toggle() end, desc = "Debug Mode: панель и клавиши" },
       -- F-клавиши как в Visual Studio. В терминале Windows Shift+F5 = <F17>, Shift+F11 = <F23>.
       { "<F5>", function() require("dap").continue() end, desc = "Отладка: старт / продолжить" },
       { "<S-F5>", function() require("dap").terminate() end, desc = "Отладка: остановить" },
@@ -236,6 +222,7 @@ return {
     -- даже если dap-ui ещё не загружался.
     config = function()
       local dap, dapui = require("dap"), require("dapui")
+      require("debug_mode").setup()
       -- Заметные значки: по умолчанию "B" серым цветом, его легко не увидеть.
       vim.fn.sign_define("DapBreakpoint", { text = "●", texthl = "DiagnosticError" })
       vim.fn.sign_define("DapBreakpointCondition", { text = "◆", texthl = "DiagnosticError" })
