@@ -20,7 +20,29 @@ require("lazy").setup("plugins", {
   install = { colorscheme = { "habamax" } },
 })
 
-vim.cmd.colorscheme("habamax")
+require("vimsharp_theme_state").load()
+local theme_picker = require("vimsharp_theme_picker")
+
+vim.keymap.set("n", "<leader>ui", function()
+  theme_picker.open()
+end, { desc = "Темы / Themes" })
+
+require("vimsharp_start")
+
+vim.api.nvim_create_autocmd("VimEnter", {
+  once = true,
+  callback = function()
+  if vim.fn.argc() ~= 0 then return end
+  local has_named_buffer = false
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buflisted and vim.api.nvim_buf_get_name(buf) ~= "" then
+      has_named_buffer = true
+      break
+    end
+  end
+  if not has_named_buffer then require("vimsharp_start").open() end
+  end,
+})
 
 vim.api.nvim_create_user_command("DotnetHealth", function()
   vim.cmd("checkhealth easy-dotnet")

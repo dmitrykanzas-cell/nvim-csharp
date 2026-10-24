@@ -9,6 +9,7 @@ return {
   },
   {
     "nvim-telescope/telescope.nvim",
+    version = "v0.1.9",
     cmd = "Telescope",
     dependencies = { "nvim-lua/plenary.nvim" },
     opts = {},
@@ -21,6 +22,14 @@ return {
       { "<leader>fk", "<cmd>Telescope keymaps<cr>", desc = "Найти клавишу" },
     },
   },
+  { "catppuccin/nvim", name = "catppuccin", lazy = false, priority = 1000 },
+  { "folke/tokyonight.nvim", lazy = false, priority = 1000 },
+  { "ellisonleao/gruvbox.nvim", lazy = false, priority = 1000 },
+  { "rebelot/kanagawa.nvim", lazy = false, priority = 1000 },
+  { "rose-pine/neovim", name = "rose-pine", lazy = false, priority = 1000 },
+  { "EdenEast/nightfox.nvim", lazy = false, priority = 1000 },
+  { "sainnhe/everforest", lazy = false, priority = 1000 },
+  { "navarasu/onedark.nvim", lazy = false, priority = 1000 },
   {
     "nvim-neo-tree/neo-tree.nvim",
     branch = "v3.x",
