@@ -23,7 +23,7 @@ require("lazy").setup("plugins", {
 require("vimsharp_theme_state").load()
 local theme_picker = require("vimsharp_theme_picker")
 
-vim.keymap.set("n", "<leader>ui", function()
+vim.keymap.set("n", "<leader>t", function()
   theme_picker.open()
 end, { desc = "Темы / Themes" })
 

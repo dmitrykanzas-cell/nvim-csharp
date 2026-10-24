@@ -1,4 +1,4 @@
--- Описания клавиш для which-key с переключением RU/EN (<leader>u).
+-- Описания клавиш для which-key с переключением RU/EN (<leader>s).
 -- which-key вызывает функцию desc при каждой отрисовке, поэтому язык
 -- и состояние отладки меняются сразу, без перезапуска.
 local M = {}
@@ -39,7 +39,8 @@ local groups = {
 
 local keys = {
   { "<leader>e", "Дерево файлов", "File tree", icon = { icon = "󰙅", color = "yellow" } },
-  { "<leader>u", "Язык подсказок RU/EN", "Hint language RU/EN", icon = { icon = "", color = "grey" } },
+  { "<leader>s", "Язык подсказок RU/EN", "Hint language RU/EN", icon = { icon = "", color = "grey" } },
+  { "<leader>t", "Темы / Themes", "Themes", icon = { icon = "", color = "purple" } },
   -- Запуск: по частоте.
   { "<leader>rr", "Запустить проект", "Run project", "Ctrl+F5" },
   { "<leader>rt", "Запустить тесты", "Run tests" },

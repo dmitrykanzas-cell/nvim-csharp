@@ -97,7 +97,7 @@ return {
         preset = "modern",
         -- Порядок пунктов как в lua/hints.lua (по ходу работы), а не по алфавиту.
         sort = { "local", "manual", "group", "alphanum", "mod" },
-        -- Группы и описания RU/EN: lua/hints.lua, переключение <leader>u.
+        -- Группы и описания RU/EN: lua/hints.lua, переключение <leader>s.
         spec = require("hints").spec(),
       }
     end,

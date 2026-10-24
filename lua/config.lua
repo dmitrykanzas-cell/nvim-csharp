@@ -108,4 +108,4 @@ function _G.toggle_breakpoint()
   end)
 end
 
-vim.keymap.set("n", "<leader>u", function() require("hints").toggle() end, { desc = "Язык подсказок RU/EN" })
+vim.keymap.set("n", "<leader>s", function() require("hints").toggle() end, { desc = "Язык подсказок RU/EN" })
