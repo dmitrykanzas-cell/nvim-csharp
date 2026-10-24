@@ -176,21 +176,21 @@ local function panel_lines()
   local state = session and (session.stopped_thread_id and "PAUSED" or "RUNNING") or "NO SESSION"
   local thread = session and (session.stopped_thread_id and "thread: stopped" or "thread: none") or "thread: -"
   local lines = {
-    "╭─ DEBUG MODE ───────────────╮",
-    "│ " .. (M.active and "● ACTIVE" or "○ OFF") .. " | " .. state,
-    "│ " .. thread,
-    "│ target: " .. target_name():sub(1, 22),
-    "│ location: " .. short_location():sub(1, 20),
+    "─ DEBUG MODE ───────────────",
+    " " .. (M.active and "● ACTIVE" or "○ OFF") .. " | " .. state,
+    " " .. thread,
+    " target: " .. target_name():sub(1, 22),
+    " location: " .. short_location():sub(1, 20),
     "",
-    "│ o over  i into  u out",
-    "│ c cont  b break x stop",
-    "│ r repl  e code  l log",
-    "│ Esc close",
+    " o over  i into  u out",
+    " c cont  b break x stop",
+    " r repl  e code  l log",
+    " Esc close",
     "",
-    "│ LAST / HISTORY",
+    " LAST / HISTORY",
   }
-  for i = #M.history, 1, -1 do table.insert(lines, "│ " .. short_event(M.history[i])) end
-  table.insert(lines, "╰─────────────────────────────╯")
+  for i = #M.history, 1, -1 do table.insert(lines, " " .. short_event(M.history[i])) end
+  table.insert(lines, "─────────────────────────────")
   return lines
 end
 
@@ -203,9 +203,6 @@ function M.refresh()
   vim.api.nvim_buf_clear_namespace(M.panel_buf, M.frame_ns, 0, -1)
   vim.api.nvim_buf_add_highlight(M.panel_buf, M.frame_ns, "DebugModeBorder", 0, 0, -1)
   vim.api.nvim_buf_add_highlight(M.panel_buf, M.frame_ns, "DebugModeBorder", #lines - 1, 0, -1)
-  for row = 1, #lines - 2 do
-    vim.api.nvim_buf_add_highlight(M.panel_buf, M.frame_ns, "DebugModeBorder", row, 0, 1)
-  end
   if M.panel_win and vim.api.nvim_win_is_valid(M.panel_win) then
     vim.api.nvim_win_set_option(M.panel_win, "winhl", "Normal:DebugModePanel,EndOfBuffer:DebugModePanel,WinSeparator:DebugModeBorder,StatusLine:DebugModeBorder")
   end
