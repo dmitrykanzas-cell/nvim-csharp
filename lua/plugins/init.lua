@@ -246,6 +246,82 @@ return {
           { position = "bottom", size = 10, elements = { "repl", "console" } },
         },
       })
+
+      -- nvim-dap-ui прокручивает Console только когда она является текущим
+      -- окном. При переходе в другой класс вывод продолжает поступать, но
+      -- его окно перестаёт следовать за последней строкой. Держим follow-tail
+      -- отдельно и обновляем все видимые окна консоли, не меняя сам плагин.
+      local console_follow = {}
+      local console_attached = {}
+
+      local function console_at_tail(buf, win)
+        local count = vim.api.nvim_buf_line_count(buf)
+        return vim.api.nvim_win_get_cursor(win)[1] >= count
+      end
+
+      local function scroll_console_to_tail(buf)
+        if console_follow[buf] == false then return end
+        local count = vim.api.nvim_buf_line_count(buf)
+        for _, win in ipairs(vim.api.nvim_list_wins()) do
+          if vim.api.nvim_win_is_valid(win)
+            and vim.api.nvim_win_get_buf(win) == buf
+            and vim.api.nvim_win_get_config(win).relative == "" then
+            pcall(vim.api.nvim_win_call, win, function()
+              vim.api.nvim_win_set_cursor(win, { count, 0 })
+              vim.cmd("normal! zz")
+            end)
+          end
+        end
+      end
+
+      local function attach_console(buf)
+        if console_attached[buf] then return end
+        console_attached[buf] = true
+        console_follow[buf] = true
+
+        vim.api.nvim_buf_attach(buf, false, {
+          on_lines = function()
+            vim.schedule(function()
+              if vim.api.nvim_buf_is_valid(buf) then scroll_console_to_tail(buf) end
+            end)
+          end,
+          on_detach = function()
+            console_attached[buf] = nil
+            console_follow[buf] = nil
+          end,
+        })
+      end
+
+      local console_group = vim.api.nvim_create_augroup("nvim_csharp_dap_console", { clear = true })
+      vim.api.nvim_create_autocmd("FileType", {
+        group = console_group,
+        pattern = "dapui_console",
+        callback = function(args) attach_console(args.buf) end,
+      })
+      vim.api.nvim_create_autocmd({ "CursorMoved", "WinScrolled" }, {
+        group = console_group,
+        pattern = "*",
+        callback = function(args)
+          local buf = args.buf
+          if vim.bo[buf].filetype ~= "dapui_console" then return end
+          local win = vim.api.nvim_get_current_win()
+          if vim.api.nvim_win_get_buf(win) == buf then
+            console_follow[buf] = console_at_tail(buf, win)
+          end
+        end,
+      })
+      vim.api.nvim_create_autocmd({ "BufWinEnter", "WinEnter", "BufEnter" }, {
+        group = console_group,
+        pattern = "*",
+        callback = function(args)
+          if vim.bo[args.buf].filetype == "dapui_console" then
+            attach_console(args.buf)
+            vim.schedule(function()
+              if vim.api.nvim_buf_is_valid(args.buf) then scroll_console_to_tail(args.buf) end
+            end)
+          end
+        end,
+      })
       -- Окна не закрываются сами после остановки: вывод программы остаётся виден.
       -- Скрыть: <leader>dd.
       dap.listeners.after.event_initialized["dapui_config"] = function() dapui.open() end
