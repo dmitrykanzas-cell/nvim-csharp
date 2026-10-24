@@ -204,7 +204,10 @@ return {
       { "<leader>du", function() require("dap").step_out() end, desc = "Step out" },
       { "<leader>dx", function() require("dap").terminate() end, desc = "Остановить" },
       { "<leader>dr", function() require("dap").repl.toggle() end, desc = "REPL" },
-      { "<leader>dd", function() require("dapui").toggle() end, desc = "Окна отладки показать/скрыть" },
+      { "<leader>dd", function()
+        require("dapui").toggle()
+        vim.defer_fn(function() require("debug_mode").normalize_sidebar() end, 100)
+      end, desc = "Окна отладки показать/скрыть" },
       { "<leader>dh", function() require("dapui").float_element("scopes", { enter = true }) end, desc = "Переменные (всплывающее окно)" },
       { "<leader>de", function() _G.goto_code_window() end, desc = "Вернуться в код" },
       { "<leader>dm", function() require("debug_mode").toggle() end, desc = "Debug Mode: панель и клавиши" },

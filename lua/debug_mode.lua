@@ -11,6 +11,10 @@ M.neo_wrap = nil
 M.neo_winfixwidth = nil
 M.neo_was_open = false
 M.neo_width = 34
+M.sidebar_width = 34
+M.dapui_was_open = false
+M.dapui_resume_pending = false
+M.restore_left_width = nil
 M.history = {}
 M.max_history = 8
 M.log_file = vim.fn.stdpath("data") .. "/debug-mode.log"
@@ -215,12 +219,61 @@ local function find_neo_window()
   end
 end
 
+function M.normalize_sidebar()
+  local width = M.sidebar_width or M.neo_width or 34
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    local ft = vim.bo[buf].filetype
+    if ft == "neo-tree" or ft == "debug_mode" then
+      pcall(vim.api.nvim_win_set_width, win, width)
+    end
+  end
+end
+
+local function dapui_open()
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    local ft = vim.bo[vim.api.nvim_win_get_buf(win)].filetype
+    if ft == "dapui_scopes" or ft == "dapui_stacks" or ft == "dapui_watches"
+      or ft == "dapui_breakpoints" or ft == "dapui_console" or ft == "dap-repl" then
+      return true
+    end
+  end
+  return false
+end
+
+local function suspend_dapui()
+  M.dapui_was_open = dapui_open()
+  if M.dapui_was_open then pcall(function() require("dapui").close() end) end
+end
+
+local function resume_dapui()
+  if not M.dapui_was_open or M.dapui_resume_pending then return end
+  M.dapui_resume_pending = true
+  vim.defer_fn(function()
+    if M.dapui_was_open then pcall(function() require("dapui").open() end) end
+    if M.restore_left_width then
+      for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        local buf = vim.api.nvim_win_get_buf(win)
+        local ft = vim.bo[buf].filetype
+        if ft == "debug_mode" or ft == "neo-tree" then
+          pcall(vim.api.nvim_win_set_width, win, M.restore_left_width)
+        end
+      end
+    end
+    M.dapui_was_open = false
+    M.dapui_resume_pending = false
+    M.restore_left_width = nil
+  end, 80)
+end
+
 local function open_panel()
   if M.panel_win and vim.api.nvim_win_is_valid(M.panel_win) then return end
   M.neo_win, M.neo_buf = find_neo_window()
   if M.neo_win and vim.api.nvim_win_is_valid(M.neo_win) then
+    suspend_dapui()
     M.neo_was_open = true
     M.neo_width = vim.api.nvim_win_get_width(M.neo_win)
+    M.sidebar_width = M.neo_width
     M.neo_winhl = vim.wo[M.neo_win].winhl
     M.neo_wrap = vim.wo[M.neo_win].wrap
     M.neo_winfixwidth = vim.wo[M.neo_win].winfixwidth
@@ -236,11 +289,15 @@ local function open_panel()
   vim.api.nvim_win_set_buf(M.panel_win, M.panel_buf)
   vim.api.nvim_win_set_option(M.panel_win, "winfixwidth", true)
   vim.api.nvim_win_set_option(M.panel_win, "wrap", false)
+  M.restore_left_width = M.neo_width
   M.refresh()
+  resume_dapui()
 end
 
 local function close_panel()
   if M.panel_win and vim.api.nvim_win_is_valid(M.panel_win) then
+    suspend_dapui()
+    M.restore_left_width = M.neo_width
     vim.api.nvim_win_close(M.panel_win, true)
     if M.neo_was_open then
       pcall(vim.cmd, "Neotree show left")
@@ -250,6 +307,7 @@ local function close_panel()
   M.neo_win, M.neo_buf = nil, nil
   M.neo_winhl, M.neo_wrap, M.neo_winfixwidth = nil, nil, nil
   M.neo_was_open, M.neo_width = false, 34
+  resume_dapui()
 end
 
 function M.toggle()
