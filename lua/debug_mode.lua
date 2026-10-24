@@ -7,6 +7,7 @@ M.target_win = nil
 M.history = {}
 M.max_history = 8
 M.log_file = vim.fn.stdpath("data") .. "/debug-mode.log"
+M.pending = nil
 
 local keys = { "o", "i", "u", "c", "b", "x", "r", "e", "l", "<Esc>" }
 local saved_maps = { n = {}, t = {} }
@@ -17,6 +18,7 @@ local dap_events = {
   "event_terminated",
   "event_exited",
 }
+local async_commands = { step_over = true, step_into = true, step_out = true, continue = true }
 
 local function safe_name(value)
   return value and tostring(value):gsub("\n", " ") or "-"
@@ -84,7 +86,12 @@ local function run(name, action)
     action()
   end)
   if ok then
-    event(name .. " | focus=" .. target .. " | " .. before .. " -> " .. current_location())
+    if async_commands[name] then
+      M.pending = { name = name, target = target, before = before }
+      event(name .. " REQUEST | focus=" .. target .. " | " .. before)
+    else
+      event(name .. " | focus=" .. target .. " | " .. before .. " -> " .. current_location())
+    end
   else
     event(name .. " | ERROR: " .. tostring(err))
     vim.notify("Debug Mode: " .. tostring(err), vim.log.levels.ERROR)
@@ -153,10 +160,11 @@ local function open_panel()
   vim.bo[M.panel_buf].filetype = "debug_mode"
   vim.bo[M.panel_buf].bufhidden = "wipe"
   vim.bo[M.panel_buf].modifiable = false
-  local width = math.min(82, math.max(60, vim.o.columns - 8))
-  local height = math.min(16, math.max(10, vim.o.lines - 8))
+  -- Left side: occupy the Neo-tree column, leaving the right DAP information area free.
+  local width = math.min(40, math.max(32, math.floor(vim.o.columns * 0.22)))
+  local height = math.max(10, vim.o.lines - 4)
   M.panel_win = vim.api.nvim_open_win(M.panel_buf, false, {
-    relative = "editor", row = vim.o.lines - height - 3, col = vim.o.columns - width - 2,
+    relative = "editor", row = 1, col = 1,
     width = width, height = height, style = "minimal", border = "rounded",
     title = " Debug control panel ", title_pos = "center",
   })
@@ -203,6 +211,7 @@ function M.stop()
   if not M.active then return end
   event("MODE OFF | target=" .. target_name())
   M.active = false
+  M.pending = nil
   M.target_win = nil
   restore_maps()
   pcall(vim.keymap.del, "n", "<Esc>")
@@ -211,7 +220,19 @@ end
 
 function M.on_dap(name)
   return function()
-    if M.active then event("DAP " .. name .. " | " .. current_location()) end
+    if not M.active then return end
+    if name == "event_stopped" and M.pending then
+      local pending = M.pending
+      M.pending = nil
+      event(string.format("RESULT %s | focus=%s | %s -> %s", pending.name, pending.target, pending.before, current_location()))
+    elseif (name == "event_terminated" or name == "event_exited") and M.pending then
+      local pending = M.pending
+      M.pending = nil
+      event(string.format("RESULT %s | session ended before stop | %s", pending.name, current_location()))
+      event("DAP " .. name .. " | " .. current_location())
+    else
+      event("DAP " .. name .. " | " .. current_location())
+    end
   end
 end
 
