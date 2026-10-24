@@ -9,6 +9,8 @@ M.neo_buf = nil
 M.neo_winhl = nil
 M.neo_wrap = nil
 M.neo_winfixwidth = nil
+M.neo_was_open = false
+M.neo_width = 34
 M.history = {}
 M.max_history = 8
 M.log_file = vim.fn.stdpath("data") .. "/debug-mode.log"
@@ -219,45 +221,38 @@ end
 local function open_panel()
   if M.panel_win and vim.api.nvim_win_is_valid(M.panel_win) then return end
   M.neo_win, M.neo_buf = find_neo_window()
-  if not M.neo_win then
-    pcall(vim.cmd, "Neotree show left")
-    M.neo_win, M.neo_buf = find_neo_window()
+  if M.neo_win and vim.api.nvim_win_is_valid(M.neo_win) then
+    M.neo_was_open = true
+    M.neo_width = vim.api.nvim_win_get_width(M.neo_win)
+    M.neo_winhl = vim.wo[M.neo_win].winhl
+    M.neo_wrap = vim.wo[M.neo_win].wrap
+    M.neo_winfixwidth = vim.wo[M.neo_win].winfixwidth
+    pcall(vim.cmd, "Neotree close")
+    M.neo_win, M.neo_buf = nil, nil
   end
   M.panel_buf = vim.api.nvim_create_buf(false, true)
   vim.bo[M.panel_buf].filetype = "debug_mode"
   vim.bo[M.panel_buf].bufhidden = "wipe"
   vim.bo[M.panel_buf].modifiable = false
-  if M.neo_win and vim.api.nvim_win_is_valid(M.neo_win) then
-    M.neo_winhl = vim.wo[M.neo_win].winhl
-    M.neo_wrap = vim.wo[M.neo_win].wrap
-    M.neo_winfixwidth = vim.wo[M.neo_win].winfixwidth
-    M.panel_win = M.neo_win
-    vim.api.nvim_win_set_buf(M.panel_win, M.panel_buf)
-    vim.api.nvim_win_set_option(M.panel_win, "winfixwidth", true)
-  else
-    vim.cmd("topleft vertical 34new")
-    M.panel_win = vim.api.nvim_get_current_win()
-    vim.api.nvim_win_set_buf(M.panel_win, M.panel_buf)
-  end
+  vim.cmd("topleft vertical " .. tostring(M.neo_width) .. "new")
+  M.panel_win = vim.api.nvim_get_current_win()
+  vim.api.nvim_win_set_buf(M.panel_win, M.panel_buf)
+  vim.api.nvim_win_set_option(M.panel_win, "winfixwidth", true)
   vim.api.nvim_win_set_option(M.panel_win, "wrap", false)
   M.refresh()
 end
 
 local function close_panel()
   if M.panel_win and vim.api.nvim_win_is_valid(M.panel_win) then
-    if M.neo_win and M.panel_win == M.neo_win then
-      pcall(vim.api.nvim_win_set_buf, M.panel_win, M.neo_buf)
-      vim.wo[M.panel_win].winhl = M.neo_winhl or ""
-      vim.wo[M.panel_win].wrap = M.neo_wrap ~= false
-      vim.wo[M.panel_win].winfixwidth = M.neo_winfixwidth or false
-      pcall(vim.cmd, "Neotree reveal")
-    else
-      vim.api.nvim_win_close(M.panel_win, true)
+    vim.api.nvim_win_close(M.panel_win, true)
+    if M.neo_was_open then
+      pcall(vim.cmd, "Neotree show left")
     end
   end
   M.panel_win, M.panel_buf = nil, nil
   M.neo_win, M.neo_buf = nil, nil
   M.neo_winhl, M.neo_wrap, M.neo_winfixwidth = nil, nil, nil
+  M.neo_was_open, M.neo_width = false, 34
 end
 
 function M.toggle()
