@@ -138,8 +138,10 @@ return {
       require("mason-lspconfig").setup()
       local capabilities = require("cmp_nvim_lsp").default_capabilities()
       vim.lsp.config("lua_ls", { capabilities = capabilities })
-      vim.lsp.config("roslyn", { capabilities = capabilities })
-      vim.lsp.enable({ "lua_ls", "roslyn" })
+      -- roslyn.nvim owns the Roslyn configuration and enables it itself.
+      -- Registering it here races with roslyn.nvim lazy-loading and produces
+      -- an initial `cmd: ... got nil` error.
+      vim.lsp.enable("lua_ls")
       vim.api.nvim_create_autocmd("LspAttach", {
         callback = function(args)
           local client = vim.lsp.get_client_by_id(args.data.client_id)
