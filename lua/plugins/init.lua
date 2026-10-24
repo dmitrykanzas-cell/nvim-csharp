@@ -207,8 +207,21 @@ return {
       { "<leader>dd", function() require("dapui").toggle() end, desc = "Окна отладки показать/скрыть" },
       { "<leader>dh", function() require("dapui").float_element("scopes", { enter = true }) end, desc = "Переменные (всплывающее окно)" },
       { "<leader>de", function() _G.goto_code_window() end, desc = "Вернуться в код" },
-      -- Режим отладки: меню <leader>d остаётся открытым, шаги одной клавишей (o o i u). Выход: Esc.
-      { "<leader>dD", function() require("which-key").show({ keys = "<leader>d", loop = true }) end, desc = "Режим отладки" },
+      -- Режим отладки: меню <leader>d остаётся открытым, шаги одной клавишей (o, i, u). Выход: Esc.
+      {
+        "<leader>dm",
+        function()
+          -- which-key caches its key tree per buffer. Keep the tree from the
+          -- editor buffer that opened the menu, otherwise BufEnter during a
+          -- debug step silently ends the loop.
+          require("which-key").show({
+            keys = "<leader>d",
+            loop = true,
+            buf = vim.api.nvim_get_current_buf(),
+          })
+        end,
+        desc = "Закрепить меню отладки",
+      },
       -- F-клавиши как в Visual Studio. В терминале Windows Shift+F5 = <F17>, Shift+F11 = <F23>.
       { "<F5>", function() require("dap").continue() end, desc = "Отладка: старт / продолжить" },
       { "<S-F5>", function() require("dap").terminate() end, desc = "Отладка: остановить" },
