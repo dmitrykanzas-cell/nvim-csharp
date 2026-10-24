@@ -4,10 +4,16 @@ M.active = false
 M.panel_buf = nil
 M.panel_win = nil
 M.target_win = nil
+M.neo_win = nil
+M.neo_buf = nil
+M.neo_winhl = nil
+M.neo_wrap = nil
+M.neo_winfixwidth = nil
 M.history = {}
 M.max_history = 8
 M.log_file = vim.fn.stdpath("data") .. "/debug-mode.log"
 M.pending = nil
+M.frame_ns = vim.api.nvim_create_namespace("debug_mode_frame")
 
 local keys = { "o", "i", "u", "c", "b", "x", "r", "e", "l", "<Esc>" }
 local saved_maps = { n = {}, t = {} }
@@ -33,6 +39,30 @@ local function current_location()
   if not frame then return "paused / frame unavailable" end
   local source = frame.source and (frame.source.path or frame.source.name) or "?"
   return string.format("%s:%s  %s()", safe_name(source), frame.line or "?", safe_name(frame.name))
+end
+
+local function short_location()
+  local location = current_location()
+  if location == "no session" or location == "paused / frame unavailable" or location == "no dap" then
+    return location
+  end
+  local file, line = location:match("([^/\\]+):([^ ]+)")
+  return file and string.format("%s:%s", file, line) or location
+end
+
+local function short_event(text)
+  local command, before, after = text:match("RESULT%s+(%S+)%s+|%s+focus=[^|]+|%s+([^|]+)%s+->%s+(.+)")
+  if command then
+    local before_line = before:match(":(%d+)") or "?"
+    local after_line = after:match(":(%d+)") or "?"
+    return string.format("✓ %s  %s→%s", command:gsub("step_", ""), before_line, after_line)
+  end
+  local request = text:match("(%S+)%s+REQUEST")
+  if request then return "· " .. request:gsub("step_", "") .. " request" end
+  local dap_name = text:match("DAP event_(%S+)")
+  if dap_name then return "● " .. dap_name:gsub("_", " ") end
+  if text:find("ERROR") or text:find("session ended") then return "! " .. text:gsub("^.-|%s*", "") end
+  return text:sub(1, 34)
 end
 
 local function focus_name()
@@ -77,6 +107,20 @@ local function event(text)
 end
 
 local function run(name, action)
+  if async_commands[name] then
+    local ok, dap = pcall(require, "dap")
+    local session = ok and dap.session() or nil
+    if not session then
+      event(name .. " | ERROR: no active session")
+      vim.notify("Debug Mode: нет активной сессии", vim.log.levels.WARN)
+      return
+    end
+    if not session.stopped_thread_id then
+      event(name .. " | ERROR: no stopped thread")
+      vim.notify("Debug Mode: нет остановленного потока", vim.log.levels.WARN)
+      return
+    end
+  end
   local before = current_location()
   local target = focus_name()
   local ok, err = pcall(function()
@@ -128,53 +172,92 @@ local function panel_lines()
   local ok, dap = pcall(require, "dap")
   local session = ok and dap.session() or nil
   local state = session and (session.stopped_thread_id and "PAUSED" or "RUNNING") or "NO SESSION"
+  local thread = session and (session.stopped_thread_id and "thread: stopped" or "thread: none") or "thread: -"
   local lines = {
-    " DEBUG MODE  " .. (M.active and "● ACTIVE" or "○ OFF") .. "  |  " .. state,
-    " target: " .. target_name(),
-    " location: " .. current_location(),
+    "╭─ DEBUG MODE ───────────────╮",
+    "│ " .. (M.active and "● ACTIVE" or "○ OFF") .. " | " .. state,
+    "│ " .. thread,
+    "│ target: " .. target_name():sub(1, 22),
+    "│ location: " .. short_location():sub(1, 20),
     "",
-    " o step over    i step into    u step out",
-    " c continue     b breakpoint   x stop",
-    " r REPL         e code window   l full log",
-    " Esc close mode",
+    "│ o over  i into  u out",
+    "│ c cont  b break x stop",
+    "│ r repl  e code  l log",
+    "│ Esc close",
     "",
-    " HISTORY (latest first):",
+    "│ LAST / HISTORY",
   }
-  for i = #M.history, 1, -1 do table.insert(lines, " " .. M.history[i]) end
+  for i = #M.history, 1, -1 do table.insert(lines, "│ " .. short_event(M.history[i])) end
+  table.insert(lines, "╰─────────────────────────────╯")
   return lines
 end
 
 function M.refresh()
   if not M.panel_buf or not vim.api.nvim_buf_is_valid(M.panel_buf) then return end
   vim.bo[M.panel_buf].modifiable = true
-  vim.api.nvim_buf_set_lines(M.panel_buf, 0, -1, false, panel_lines())
+  local lines = panel_lines()
+  vim.api.nvim_buf_set_lines(M.panel_buf, 0, -1, false, lines)
   vim.bo[M.panel_buf].modifiable = false
+  vim.api.nvim_buf_clear_namespace(M.panel_buf, M.frame_ns, 0, -1)
+  vim.api.nvim_buf_add_highlight(M.panel_buf, M.frame_ns, "DebugModeBorder", 0, 0, -1)
+  vim.api.nvim_buf_add_highlight(M.panel_buf, M.frame_ns, "DebugModeBorder", #lines - 1, 0, -1)
+  for row = 1, #lines - 2 do
+    vim.api.nvim_buf_add_highlight(M.panel_buf, M.frame_ns, "DebugModeBorder", row, 0, 1)
+  end
   if M.panel_win and vim.api.nvim_win_is_valid(M.panel_win) then
-    vim.api.nvim_win_set_option(M.panel_win, "winhl", "Normal:DebugModePanel,FloatBorder:DebugModeBorder")
+    vim.api.nvim_win_set_option(M.panel_win, "winhl", "Normal:DebugModePanel,EndOfBuffer:DebugModePanel,WinSeparator:DebugModeBorder,StatusLine:DebugModeBorder")
+  end
+end
+
+local function find_neo_window()
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    if vim.bo[buf].filetype == "neo-tree" then return win, buf end
   end
 end
 
 local function open_panel()
   if M.panel_win and vim.api.nvim_win_is_valid(M.panel_win) then return end
+  M.neo_win, M.neo_buf = find_neo_window()
+  if not M.neo_win then
+    pcall(vim.cmd, "Neotree show left")
+    M.neo_win, M.neo_buf = find_neo_window()
+  end
   M.panel_buf = vim.api.nvim_create_buf(false, true)
   vim.bo[M.panel_buf].filetype = "debug_mode"
   vim.bo[M.panel_buf].bufhidden = "wipe"
   vim.bo[M.panel_buf].modifiable = false
-  -- Left side: occupy the Neo-tree column, leaving the right DAP information area free.
-  local width = math.min(40, math.max(32, math.floor(vim.o.columns * 0.22)))
-  local height = math.max(10, vim.o.lines - 4)
-  M.panel_win = vim.api.nvim_open_win(M.panel_buf, false, {
-    relative = "editor", row = 1, col = 1,
-    width = width, height = height, style = "minimal", border = "rounded",
-    title = " Debug control panel ", title_pos = "center",
-  })
+  if M.neo_win and vim.api.nvim_win_is_valid(M.neo_win) then
+    M.neo_winhl = vim.wo[M.neo_win].winhl
+    M.neo_wrap = vim.wo[M.neo_win].wrap
+    M.neo_winfixwidth = vim.wo[M.neo_win].winfixwidth
+    M.panel_win = M.neo_win
+    vim.api.nvim_win_set_buf(M.panel_win, M.panel_buf)
+    vim.api.nvim_win_set_option(M.panel_win, "winfixwidth", true)
+  else
+    vim.cmd("topleft vertical 34new")
+    M.panel_win = vim.api.nvim_get_current_win()
+    vim.api.nvim_win_set_buf(M.panel_win, M.panel_buf)
+  end
   vim.api.nvim_win_set_option(M.panel_win, "wrap", false)
   M.refresh()
 end
 
 local function close_panel()
-  if M.panel_win and vim.api.nvim_win_is_valid(M.panel_win) then vim.api.nvim_win_close(M.panel_win, true) end
+  if M.panel_win and vim.api.nvim_win_is_valid(M.panel_win) then
+    if M.neo_win and M.panel_win == M.neo_win then
+      pcall(vim.api.nvim_win_set_buf, M.panel_win, M.neo_buf)
+      vim.wo[M.panel_win].winhl = M.neo_winhl or ""
+      vim.wo[M.panel_win].wrap = M.neo_wrap ~= false
+      vim.wo[M.panel_win].winfixwidth = M.neo_winfixwidth or false
+      pcall(vim.cmd, "Neotree reveal")
+    else
+      vim.api.nvim_win_close(M.panel_win, true)
+    end
+  end
   M.panel_win, M.panel_buf = nil, nil
+  M.neo_win, M.neo_buf = nil, nil
+  M.neo_winhl, M.neo_wrap, M.neo_winfixwidth = nil, nil, nil
 end
 
 function M.toggle()
