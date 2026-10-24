@@ -243,7 +243,7 @@ return {
               { id = "breakpoints", size = 0.2 },
             },
           },
-          { position = "bottom", size = 10, elements = { "repl", "console" } },
+          { position = "bottom", size = 10, elements = { "console" } },
         },
       })
 
