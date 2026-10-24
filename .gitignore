@@ -1,0 +1,24 @@
+# Neovim temporary files
+*.swp
+*.swo
+*.swn
+*.tmp
+*.bak
+
+# Runtime and cache files
+.cache/
+log/
+shada/
+view/
+spell/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Local test artifacts
+*.log
+
+# Credentials and local environment files
+.env
+.env.*
