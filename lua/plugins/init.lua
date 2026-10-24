@@ -86,6 +86,8 @@ return {
       return {
         delay = 200,
         preset = "modern",
+        -- Порядок пунктов как в lua/hints.lua (по ходу работы), а не по алфавиту.
+        sort = { "local", "manual", "group", "alphanum", "mod" },
         -- Группы и описания RU/EN: lua/hints.lua, переключение <leader>u.
         spec = require("hints").spec(),
       }
@@ -146,10 +148,13 @@ return {
             vim.notify("Roslyn подключён: gd, gr, K работают. Подсказки: пробел")
           end
           local o = { buffer = args.buf, silent = true }
-          vim.keymap.set("n", "gd", vim.lsp.buf.definition, vim.tbl_extend("force", o, { desc = "Определение" }))
+          -- Через Telescope: один результат — сразу переход, несколько — всплывающий список,
+          -- который сам закрывается после выбора (в отличие от quickfix-окна).
+          local tb = function(name) return function() require("telescope.builtin")[name]({ reuse_win = true }) end end
+          vim.keymap.set("n", "gd", tb("lsp_definitions"), vim.tbl_extend("force", o, { desc = "Определение" }))
           vim.keymap.set("n", "gD", vim.lsp.buf.declaration, vim.tbl_extend("force", o, { desc = "Объявление" }))
-          vim.keymap.set("n", "gi", vim.lsp.buf.implementation, vim.tbl_extend("force", o, { desc = "Реализация" }))
-          vim.keymap.set("n", "gr", vim.lsp.buf.references, vim.tbl_extend("force", o, { desc = "Ссылки" }))
+          vim.keymap.set("n", "gi", tb("lsp_implementations"), vim.tbl_extend("force", o, { desc = "Реализация" }))
+          vim.keymap.set("n", "gr", tb("lsp_references"), vim.tbl_extend("force", o, { desc = "Ссылки" }))
           vim.keymap.set("n", "K", vim.lsp.buf.hover, vim.tbl_extend("force", o, { desc = "Документация" }))
           vim.keymap.set("n", "<leader>lr", vim.lsp.buf.rename, vim.tbl_extend("force", o, { desc = "Переименовать" }))
           vim.keymap.set("n", "<leader>la", vim.lsp.buf.code_action, vim.tbl_extend("force", o, { desc = "Code action" }))
@@ -202,6 +207,8 @@ return {
       { "<leader>dd", function() require("dapui").toggle() end, desc = "Окна отладки показать/скрыть" },
       { "<leader>dh", function() require("dapui").float_element("scopes", { enter = true }) end, desc = "Переменные (всплывающее окно)" },
       { "<leader>de", function() _G.goto_code_window() end, desc = "Вернуться в код" },
+      -- Режим отладки: меню <leader>d остаётся открытым, шаги одной клавишей (o o i u). Выход: Esc.
+      { "<leader>dD", function() require("which-key").show({ keys = "<leader>d", loop = true }) end, desc = "Режим отладки" },
       -- F-клавиши как в Visual Studio. В терминале Windows Shift+F5 = <F17>, Shift+F11 = <F23>.
       { "<F5>", function() require("dap").continue() end, desc = "Отладка: старт / продолжить" },
       { "<S-F5>", function() require("dap").terminate() end, desc = "Отладка: остановить" },
@@ -256,6 +263,9 @@ return {
         auto_bootstrap = true,
         test_runner = { viewmode = "float", enable_buffer_test_execution = true },
         debugger = { engine = "netcoredbg", auto_register_dap = true, console = "integratedTerminal" },
+        -- Свой Roslyn у easy-dotnet выключен: его уже запускает roslyn.nvim.
+        -- Два сервера давали каждый ответ дважды (gd показывал два одинаковых места).
+        lsp = { enabled = false },
       })
     end,
     keys = {
